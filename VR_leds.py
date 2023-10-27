@@ -1,11 +1,20 @@
 #必用なライブラリをインポートします
 import array, utime, math, machine
-from machine import Pin
+from machine import Pin, ADC
 import rp2
 from rp2 import PIO, StateMachine, asm_pio
 import cvt_col
 
 machine.freq(250_000_000)
+
+#AD変換のポートより、vr0の値を読み込む
+# vr0 = ADC(26)
+# vr1 = ADC(27)
+vr2 = ADC(28)
+
+K_speed = 10.0 / (65535)
+K_v = 20.0 / (65535)
+K_s = 150.0 / (65535)
 
 #WS2812 のLEDの数を指定します
 NUM_LEDS = 100
@@ -54,7 +63,7 @@ def triangle(x):
         y = 0
     return y
 
-# 6個のリストのメモリーを確保しています
+# 4個のリストのメモリーを確保しています
 LED   = [0.0 for i in range(NUM_LEDS)]
 
 y_red   = [0.0 for i in range(NUM_LEDS)]
@@ -68,44 +77,37 @@ if __name__ == '__main__':
     print('Press Ctrl-C to quit.')
     
     for i in range(60):
-        (r, g, b) = cvt_col.hsv_to_rgb(i * 6, 255, 10)
+        (r, g, b) = cvt_col.hsv_to_rgb(i * 6, 255 - K_s, 10)
         rgb_col.append([r, g, b])
 
     # Neopixelを同心円上に色を変化させて表示するための計算です
-    r_max = math.sqrt(4.5 * 4.5 * 2)
-    for i in range(NUM_LEDS):
-        # 左から何列目かを計算し、4.5を引いています
-        x = float(i % 10) - 4.5
-        # 下から何段目かを計算し、4.5を引いています
-        y = float(i) / 10.0 - 4.5
-        
-        # 中心(4.5, 4.5)からの距離を求め、最大値を１に規格化しています
-        r = math.sqrt(x*x + y*y) / r_max
-
-        # 同心円状に色を変えて表示するための処理です。20、0、40と値をずらしています
-        LED[i]   = int((r * 40) % 60.0)
-    
+    r_max = 4.5 * math.sqrt(2)
+    color = 0.0
     try:
         # 無限ループです
         while True:
-
-            #それぞれのＬＥＤの色を計算し、表示しています
+#             v = int(vr1.read_u16() * K_v)
+            v = 10
+            s = 255 - int(vr2.read_u16() * K_s)
+            color = (color - 1.0) % 60.0
             for i in range(NUM_LEDS):
-            
-                # 1ステップ前から色を1つずらします
-                LED[i]   = (LED[i]   - 2) % 60
+                # 左から何列目かを計算し、4.5を引いています
+                x = float(i % 10) - 4.5
+                # 下から何段目かを計算し、4.5を引いています
+                y = float(i) / 10.0 - 4.5
+                # 中心(4.5, 4.5)からの距離を求め、最大値を１に規格化しています
+                r = math.sqrt(x*x + y*y) / r_max * 40.0
+                r_int = int(r + color) % 60
 
-                # 関数triangle() により色を計算しています
-                y_red[i]   = rgb_col[LED[i]][0]
-                y_green[i] = rgb_col[LED[i]][1]
-                y_blue[i]  = rgb_col[LED[i]][2]
-
+                (r, g, b) = cvt_col.hsv_to_rgb(r_int * 6, s, v)
+                #それぞれのＬＥＤの色を計算し、表示しています
                 # 色を表示しています
-                ar_color(i, y_red[i], y_green[i], y_blue[i])
+                ar_color(i, r, g, b)
             sm.put(ar,8)
-#             utime.sleep_us(100)
-#             utime.sleep_us(1)
-            
+#             speed = int(vr0.read_u16() * K_speed)
+            speed = 0
+            utime.sleep_ms(speed)
+                
     # ctl-C が押されたときの処理です
     except KeyboardInterrupt:
         #### clear ws2812b
