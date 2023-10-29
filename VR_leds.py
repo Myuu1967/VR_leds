@@ -8,11 +8,11 @@ import cvt_col
 machine.freq(250_000_000)
 
 #AD変換のポートより、vr0の値を読み込む
-# vr0 = ADC(26)
-# vr1 = ADC(27)
+vr0 = ADC(26)
+vr1 = ADC(27)
 vr2 = ADC(28)
 
-K_speed = 10.0 / (65535)
+K_speed = 10000.0 / (65535)
 K_v = 20.0 / (65535)
 K_s = 150.0 / (65535)
 
@@ -86,8 +86,8 @@ if __name__ == '__main__':
     try:
         # 無限ループです
         while True:
-#             v = int(vr1.read_u16() * K_v)
-            v = 10
+            v = int(vr1.read_u16() * K_v)
+#             v = 10
             s = 255 - int(vr2.read_u16() * K_s)
             color = (color - 1.0) % 60.0
             for i in range(NUM_LEDS):
@@ -99,14 +99,16 @@ if __name__ == '__main__':
                 r = math.sqrt(x*x + y*y) / r_max * 40.0
                 r_int = int(r + color) % 60
 
+#                 s = 200
                 (r, g, b) = cvt_col.hsv_to_rgb(r_int * 6, s, v)
                 #それぞれのＬＥＤの色を計算し、表示しています
                 # 色を表示しています
                 ar_color(i, r, g, b)
             sm.put(ar,8)
-#             speed = int(vr0.read_u16() * K_speed)
-            speed = 0
-            utime.sleep_ms(speed)
+            speed = int(vr0.read_u16() * K_speed)
+#             speed = 0
+            utime.sleep_us(speed+100)
+            print(speed, v, s)
                 
     # ctl-C が押されたときの処理です
     except KeyboardInterrupt:
