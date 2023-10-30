@@ -5,15 +5,13 @@ import rp2
 from rp2 import PIO, StateMachine, asm_pio
 import cvt_col
 
-# クロック周波数を250MHzにしています。（オーバークロックです）
 machine.freq(250_000_000)
 
-#AD変換のポート(GP26~GP28)を割り当てて、vr0~vr2のインスタンスを生成します。
+#AD変換のポートより、vr0の値を読み込む
 vr0 = ADC(26)
 vr1 = ADC(27)
 vr2 = ADC(28)
 
-# 変換係数です
 K_speed = 6.0 / (65535)
 K_val = 20.0 / (65535)
 K_sat = 150.0 / (65535)
@@ -21,6 +19,7 @@ K_sat = 150.0 / (65535)
 #WS2812 のLEDの数を指定します
 NUM_LEDS = 100
 # Pico特有のstate machine を用いてWS2812の制御を行っています
+#このあたりの処理はリスト１の下のリンク先の図書より引用しました
 # PIO State Machine to display ws2812
 @asm_pio(sideset_init=PIO.OUT_LOW, out_shiftdir=PIO.SHIFT_LEFT, autopull=True,\
          pull_thresh=24)
@@ -54,42 +53,63 @@ def clear_all():
         ar[i] = 0
     sm.put(ar,8)
 
+# 色をカラフルに表示するための仕掛けが（ちょこっと）秘められています
+def triangle(x):
+    if x < 20.0:
+        y = int(1.5 * x)
+    elif x < 40.0:
+        y = 60 - int(1.5 * x)
+    else:
+        y = 0
+    return y
+
+# 4個のリストのメモリーを確保しています
+LED   = [0.0 for i in range(NUM_LEDS)]
+
+y_red   = [0.0 for i in range(NUM_LEDS)]
+y_green = [0.0 for i in range(NUM_LEDS)]
+y_blue  = [0.0 for i in range(NUM_LEDS)]
+
+rgb_col = []
 #ここから処理がスタートします
 if __name__ == '__main__':
     # Process arguments
     print('Press Ctrl-C to quit.')
     
+#     for i in range(60):
+#         (r, g, b) = cvt_col.hsv_to_rgb(i * 6, 255, 10)
+#         rgb_col.append([r, g, b])
+
+    # Neopixelを同心円上に色を変化させて表示するための計算です
     r_max = 4.5 * math.sqrt(2)
     color = 0.0
     try:
         # 無限ループです
         while True:
-            # A/D変換により値を読み取っています。
-            # 変数変換をしています。
-            # speed: -3.0~3.0
-            speed = vr0.read_u16() * K_speed - 3.0
-            color = (color - speed) % 60.0
             # v: 0~20
             v = int(vr1.read_u16() * K_val)
             # s:105~255
             s = int(vr2.read_u16() * K_sat) + 105
-
-            # Neopixelを同心円上に色を変化させて表示するための計算です
+            # speed: -3.0~3.0
+            speed = vr0.read_u16() * K_speed - 3.0
+            color = (color - speed) % 60.0
             for i in range(NUM_LEDS):
                 # 左から何列目かを計算し、4.5を引いています
                 x = float(i % 10) - 4.5
                 # 下から何段目かを計算し、4.5を引いています
                 y = float(i) / 10.0 - 4.5
                 # 中心(4.5, 4.5)からの距離を求め、最大値を１に規格化しています
-                r = math.sqrt(x*x + y*y) / r_max
-                r_int = int(r  * 40.0 + color) % 60
+                r = math.sqrt(x*x + y*y) / r_max * 40.0
+                r_int = int(r + color) % 60
 
-                #それぞれのＬＥＤの色を計算し、値を書き込んでいます
                 (r, g, b) = cvt_col.hsv_to_rgb(r_int * 6, s, v)
+                #それぞれのＬＥＤの色を計算し、表示しています
+                # 色を表示しています
                 ar_color(i, r, g, b)
-            # 色を表示しています
             sm.put(ar,8)
+#             utime.sleep_us(speed+100)
             utime.sleep_us(100)
+#             print('speed, v, s:', speed, v, s, sep = ',')
 
     # ctl-C が押されたときの処理です
     except KeyboardInterrupt:
