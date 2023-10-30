@@ -12,9 +12,9 @@ vr0 = ADC(26)
 vr1 = ADC(27)
 vr2 = ADC(28)
 
-K_speed = 10000.0 / (65535)
-K_v = 20.0 / (65535)
-K_s = 150.0 / (65535)
+K_speed = 6.0 / (65535)
+K_val = 20.0 / (65535)
+K_sat = 150.0 / (65535)
 
 #WS2812 のLEDの数を指定します
 NUM_LEDS = 100
@@ -76,9 +76,9 @@ if __name__ == '__main__':
     # Process arguments
     print('Press Ctrl-C to quit.')
     
-    for i in range(60):
-        (r, g, b) = cvt_col.hsv_to_rgb(i * 6, 255 - K_s, 10)
-        rgb_col.append([r, g, b])
+#     for i in range(60):
+#         (r, g, b) = cvt_col.hsv_to_rgb(i * 6, 255, 10)
+#         rgb_col.append([r, g, b])
 
     # Neopixelを同心円上に色を変化させて表示するための計算です
     r_max = 4.5 * math.sqrt(2)
@@ -86,10 +86,13 @@ if __name__ == '__main__':
     try:
         # 無限ループです
         while True:
-            v = int(vr1.read_u16() * K_v)
-#             v = 10
-            s = 255 - int(vr2.read_u16() * K_s)
-            color = (color - 1.0) % 60.0
+            # v: 0~20
+            v = int(vr1.read_u16() * K_val)
+            # s:105~255
+            s = int(vr2.read_u16() * K_sat) + 105
+            # speed: -3.0~3.0
+            speed = vr0.read_u16() * K_speed - 3.0
+            color = (color - speed) % 60.0
             for i in range(NUM_LEDS):
                 # 左から何列目かを計算し、4.5を引いています
                 x = float(i % 10) - 4.5
@@ -99,17 +102,15 @@ if __name__ == '__main__':
                 r = math.sqrt(x*x + y*y) / r_max * 40.0
                 r_int = int(r + color) % 60
 
-#                 s = 200
                 (r, g, b) = cvt_col.hsv_to_rgb(r_int * 6, s, v)
                 #それぞれのＬＥＤの色を計算し、表示しています
                 # 色を表示しています
                 ar_color(i, r, g, b)
             sm.put(ar,8)
-            speed = int(vr0.read_u16() * K_speed)
-#             speed = 0
-            utime.sleep_us(speed+100)
-            print(speed, v, s)
-                
+#             utime.sleep_us(speed+100)
+            utime.sleep_us(100)
+#             print('speed, v, s:', speed, v, s, sep = ',')
+
     # ctl-C が押されたときの処理です
     except KeyboardInterrupt:
         #### clear ws2812b
