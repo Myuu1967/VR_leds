@@ -2,9 +2,6 @@
 import utime, machine
 from machine import Pin, ADC
 
-
-machine.freq(250_000_000)
-
 #AD変換のポートより、vr0の値を読み込む
 vr0 = ADC(26)
 vr1 = ADC(27)
